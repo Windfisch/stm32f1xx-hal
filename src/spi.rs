@@ -26,36 +26,49 @@ pub enum Error {
     _Extensible,
 }
 
+/// A filler type for when the SCK pin is unnecessary
+pub struct NoSck;
+/// A filler type for when the Miso pin is unnecessary
+pub struct NoMiso;
+/// A filler type for when the Mosi pin is unnecessary
+pub struct NoMosi;
+
+struct FuncMiso;
+struct FuncMosi;
+struct FuncSck;
+struct Remapped;
+struct NotRemapped;
+
+trait FuncPin<SPI, Remap, Func> {}
+
+impl FuncPin<SPI1, NotRemapped, FuncSck>  for PA5<Alternate<PushPull>> {}
+impl FuncPin<SPI1, NotRemapped, FuncMiso> for PA6<Input<Floating>> {}
+impl FuncPin<SPI1, NotRemapped, FuncMosi> for PA7<Alternate<PushPull>> {}
+impl FuncPin<SPI1, Remapped, FuncSck>  for PB3<Alternate<PushPull>> {}
+impl FuncPin<SPI1, Remapped, FuncMiso> for PB4<Input<Floating>> {}
+impl FuncPin<SPI1, Remapped, FuncMosi> for PB5<Alternate<PushPull>> {}
+impl FuncPin<SPI2, NotRemapped, FuncSck>  for PB13<Alternate<PushPull>> {}
+impl FuncPin<SPI2, NotRemapped, FuncMiso> for PB14<Input<Floating>> {}
+impl FuncPin<SPI2, NotRemapped, FuncMosi> for PB15<Alternate<PushPull>> {}
+impl<SPI, Remap> FuncPin<SPI, Remap, FuncMiso> for NoMiso {}
+impl<SPI, Remap> FuncPin<SPI, Remap, FuncMosi> for NoMosi {}
+impl<SPI, Remap> FuncPin<SPI, Remap, FuncSck> for NoSck {}
+
 pub trait Pins<SPI> {
     const REMAP: bool;
 }
 
-impl Pins<SPI1>
-    for (
-        PA5<Alternate<PushPull>>,
-        PA6<Input<Floating>>,
-        PA7<Alternate<PushPull>>,
-    )
-{
-    const REMAP: bool = false;
-}
-
-impl Pins<SPI1>
-    for (
-        PB3<Alternate<PushPull>>,
-        PB4<Input<Floating>>,
-        PB5<Alternate<PushPull>>,
-    )
+impl<SPI, PinMiso, PinMosi, PinSck> Pins<SPI> for (PinMiso, PinMosi, PinSck) where
+	PinMiso : FuncPin<SPI, Remapped, FuncMiso>,
+	PinMosi : FuncPin<SPI, Remapped, FuncMosi>,
+	PinSck  : FuncPin<SPI, Remapped, FuncSck>
 {
     const REMAP: bool = true;
 }
-
-impl Pins<SPI2>
-    for (
-        PB13<Alternate<PushPull>>,
-        PB14<Input<Floating>>,
-        PB15<Alternate<PushPull>>,
-    )
+impl<SPI, PinMiso, PinMosi, PinSck> Pins<SPI> for (PinMiso, PinMosi, PinSck) where
+	PinMiso : FuncPin<SPI, NotRemapped, FuncMiso>,
+	PinMosi : FuncPin<SPI, NotRemapped, FuncMosi>,
+	PinSck  : FuncPin<SPI, NotRemapped, FuncSck>
 {
     const REMAP: bool = false;
 }
