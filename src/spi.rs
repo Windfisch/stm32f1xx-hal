@@ -26,39 +26,32 @@ pub enum Error {
     _Extensible,
 }
 
+/// A filler type for when the SCK pin is unnecessary
+pub struct NoSck;
+/// A filler type for when the Miso pin is unnecessary
+pub struct NoMiso;
+/// A filler type for when the Mosi pin is unnecessary
+pub struct NoMosi;
+
 pub trait Pins<SPI> {
     const REMAP: bool;
 }
 
-impl Pins<SPI1>
-    for (
-        PA5<Alternate<PushPull>>,
-        PA6<Input<Floating>>,
-        PA7<Alternate<PushPull>>,
-    )
-{
-    const REMAP: bool = false;
+macro_rules! declare_pins {
+	( $SPI:ty, $sck:ty, $miso:ty, $mosi:ty, $remap:expr ) => {
+		impl Pins<$SPI> for ( $sck,  $miso,  $mosi  ) { const REMAP: bool = $remap; }
+		impl Pins<$SPI> for ( NoSck, $miso,  $mosi  ) { const REMAP: bool = $remap; }
+		impl Pins<$SPI> for ( $sck,  NoMiso, $mosi  ) { const REMAP: bool = $remap; }
+		impl Pins<$SPI> for ( NoSck, NoMiso, $mosi  ) { const REMAP: bool = $remap; }
+		impl Pins<$SPI> for ( $sck,  $miso,  NoMosi ) { const REMAP: bool = $remap; }
+		impl Pins<$SPI> for ( NoSck, $miso,  NoMosi ) { const REMAP: bool = $remap; }
+		impl Pins<$SPI> for ( $sck,  NoMiso, NoMosi ) { const REMAP: bool = $remap; }
+	}
 }
 
-impl Pins<SPI1>
-    for (
-        PB3<Alternate<PushPull>>,
-        PB4<Input<Floating>>,
-        PB5<Alternate<PushPull>>,
-    )
-{
-    const REMAP: bool = true;
-}
-
-impl Pins<SPI2>
-    for (
-        PB13<Alternate<PushPull>>,
-        PB14<Input<Floating>>,
-        PB15<Alternate<PushPull>>,
-    )
-{
-    const REMAP: bool = false;
-}
+declare_pins!{SPI1, PA5<Alternate<PushPull>>, PA6<Input<Floating>>, PA7<Alternate<PushPull>>, true}
+declare_pins!{SPI1, PB3<Alternate<PushPull>>, PB4<Input<Floating>>, PB5<Alternate<PushPull>>, false}
+declare_pins!{SPI2, PB13<Alternate<PushPull>>, PB14<Input<Floating>>, PB15<Alternate<PushPull>>, false}
 
 pub struct Spi<SPI, PINS> {
     spi: SPI,
