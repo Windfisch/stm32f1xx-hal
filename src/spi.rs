@@ -545,15 +545,25 @@ where
 }
 
 // DMA
-
-pub struct SpiPayload<SPI, REMAP, PINS> {
-    spi: Spi<SPI, REMAP, PINS, u8>,
-}
-
-pub type SpiTxDma<SPI, REMAP, PINS, CHANNEL> = TxDma<SpiPayload<SPI, REMAP, PINS>, CHANNEL>;
-pub type SpiRxDma<SPI, REMAP, PINS, CHANNEL> = RxDma<SpiPayload<SPI, REMAP, PINS>, CHANNEL>;
+pub type SpiRxDma<SPI, REMAP, PINS, CHANNEL> = RxDma<Spi<SPI, REMAP, PINS, u8>, CHANNEL>;
+pub type SpiTxDma<SPI, REMAP, PINS, CHANNEL> = TxDma<Spi<SPI, REMAP, PINS, u8>, CHANNEL>;
 pub type SpiRxTxDma<SPI, REMAP, PINS, RXCHANNEL, TXCHANNEL> =
-    RxTxDma<SpiPayload<SPI, REMAP, PINS>, RXCHANNEL, TXCHANNEL>;
+    RxTxDma<Spi<SPI, REMAP, PINS, u8>, RXCHANNEL, TXCHANNEL>;
+
+pub type Spi1RxDma<REMAP, PINS> = SpiRxDma<SPI1, REMAP, PINS, dma1::C2>;
+pub type Spi1TxDma<REMAP, PINS> = SpiTxDma<SPI1, REMAP, PINS, dma1::C3>;
+pub type Spi1RxTxDma<REMAP, PINS> = SpiRxTxDma<SPI1, REMAP, PINS, dma1::C2, dma1::C3>;
+
+pub type Spi2RxDma<REMAP, PINS> = SpiRxDma<SPI2, REMAP, PINS, dma1::C4>;
+pub type Spi2TxDma<REMAP, PINS> = SpiTxDma<SPI2, REMAP, PINS, dma1::C5>;
+pub type Spi2RxTxDma<REMAP, PINS> = SpiRxTxDma<SPI2, REMAP, PINS, dma1::C4, dma1::C5>;
+
+#[cfg(feature = "connectivity")]
+pub type Spi3RxDma<REMAP, PINS> = SpiRxDma<SPI3, REMAP, PINS, dma1::C1>;
+#[cfg(feature = "connectivity")]
+pub type Spi3TxDma<REMAP, PINS> = SpiTxDma<SPI3, REMAP, PINS, dma1::C2>;
+#[cfg(feature = "connectivity")]
+pub type Spi3RxTxDma<REMAP, PINS> = SpiRxTxDma<SPI3, REMAP, PINS, dma1::C1, dma1::C2>;
 
 macro_rules! spi_dma {
     ($SPIi:ident, $RCi:ty, $TCi:ty) => {
@@ -580,13 +590,17 @@ macro_rules! spi_dma {
         impl<REMAP, PINS> Spi<$SPIi, REMAP, PINS, u8> {
             pub fn with_tx_dma(self, channel: $TCi) -> SpiTxDma<$SPIi, REMAP, PINS, $TCi> {
                 self.spi.cr2.modify(|_, w| w.txdmaen().set_bit());
-                let payload = SpiPayload { spi: self };
-                SpiTxDma { payload, channel }
+                SpiTxDma {
+                    payload: self,
+                    channel,
+                }
             }
             pub fn with_rx_dma(self, channel: $RCi) -> SpiRxDma<$SPIi, REMAP, PINS, $RCi> {
                 self.spi.cr2.modify(|_, w| w.rxdmaen().set_bit());
-                let payload = SpiPayload { spi: self };
-                SpiRxDma { payload, channel }
+                SpiRxDma {
+                    payload: self,
+                    channel,
+                }
             }
             pub fn with_rx_tx_dma(
                 self,
@@ -596,9 +610,8 @@ macro_rules! spi_dma {
                 self.spi
                     .cr2
                     .modify(|_, w| w.rxdmaen().set_bit().txdmaen().set_bit());
-                let payload = SpiPayload { spi: self };
                 SpiRxTxDma {
-                    payload,
+                    payload: self,
                     rxchannel,
                     txchannel,
                 }
@@ -608,16 +621,16 @@ macro_rules! spi_dma {
         impl<REMAP, PINS> SpiTxDma<$SPIi, REMAP, PINS, $TCi> {
             pub fn release(self) -> (Spi<$SPIi, REMAP, PINS, u8>, $TCi) {
                 let SpiTxDma { payload, channel } = self;
-                payload.spi.spi.cr2.modify(|_, w| w.txdmaen().clear_bit());
-                (payload.spi, channel)
+                payload.spi.cr2.modify(|_, w| w.txdmaen().clear_bit());
+                (payload, channel)
             }
         }
 
         impl<REMAP, PINS> SpiRxDma<$SPIi, REMAP, PINS, $RCi> {
             pub fn release(self) -> (Spi<$SPIi, REMAP, PINS, u8>, $RCi) {
                 let SpiRxDma { payload, channel } = self;
-                payload.spi.spi.cr2.modify(|_, w| w.rxdmaen().clear_bit());
-                (payload.spi, channel)
+                payload.spi.cr2.modify(|_, w| w.rxdmaen().clear_bit());
+                (payload, channel)
             }
         }
 
@@ -630,10 +643,9 @@ macro_rules! spi_dma {
                 } = self;
                 payload
                     .spi
-                    .spi
                     .cr2
                     .modify(|_, w| w.rxdmaen().clear_bit().txdmaen().clear_bit());
-                (payload.spi, rxchannel, txchannel)
+                (payload, rxchannel, txchannel)
             }
         }
 
